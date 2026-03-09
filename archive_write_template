@@ -1,0 +1,107 @@
+REPORT zcusarch_write .
+
+* data definition
+TABLES: ztestarch.
+
+DATA: gv_test(1) TYPE c,
+gv_arc_hand TYPE sy-tabix,
+gv_text TYPE admi_run-comments,
+gv_datu TYPE sy-datum,
+gt_zcus TYPE TABLE OF ztestarch,
+gs_zcus TYPE ztestarch,
+zcus_cur TYPE cursor,
+gv_count_rec TYPE i,
+gv_count TYPE i.
+
+* Selection parameters
+SELECTION-SCREEN BEGIN OF BLOCK sel_data WITH FRAME TITLE text-001.
+PARAMETERS: p_vkorg TYPE ztestarch-vkorg OBLIGATORY,
+p_vtweg TYPE ztestarch-vtweg OBLIGATORY.
+SELECT-OPTIONS: s_vbeln FOR ztestarch-vbeln.
+
+SELECTION-SCREEN END OF BLOCK sel_data.
+
+SELECTION-SCREEN BEGIN OF BLOCK sel_prog WITH FRAME TITLE text-002.
+PARAMETERS: p_test AS CHECKBOX DEFAULT 'X'.
+SELECTION-SCREEN END OF BLOCK sel_prog.
+
+* Start-of-selection
+START-OF-SELECTION.
+
+* set runtime parameters
+
+CLEAR: gv_test.
+
+IF NOT p_test IS INITIAL.
+gv_test = 'X'.
+ENDIF.
+
+* open archive file
+CALL FUNCTION 'ARCHIVE_OPEN_FOR_WRITE'
+EXPORTING
+call_delete_job_in_test_mode = gv_test
+create_archive_file = 'X'
+object = 'ZCUSARCH'
+IMPORTING
+archive_handle = gv_arc_hand
+EXCEPTIONS
+internal_error = 1
+object_not_found = 2
+open_error = 3
+not_authorized = 4.
+IF sy-subrc <> 0.
+
+MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+ENDIF.
+
+* Read the entries from Database
+CLEAR gv_count_rec.
+OPEN CURSOR WITH HOLD zcus_cur FOR
+SELECT * FROM ztestarch WHERE vbeln IN s_vbeln
+AND vkorg EQ p_vkorg
+AND vtweg EQ p_vtweg.
+DO.
+FETCH NEXT CURSOR zcus_cur INTO TABLE gt_zcus
+PACKAGE SIZE 1000.
+IF sy-subrc <> 0.
+EXIT.
+ENDIF.
+SORT gt_zcus.
+
+* open archive object
+
+DESCRIBE TABLE gt_zcus LINES gv_count.
+gv_count_rec = gv_count_rec + gv_count.
+
+IF gv_count_rec GT 0 AND gv_test EQ space.
+CALL FUNCTION 'ARCHIVE_NEW_OBJECT'
+EXPORTING
+archive_handle = gv_arc_hand.
+
+LOOP AT gt_zcus INTO gs_zcus.
+CALL FUNCTION 'ARCHIVE_PUT_RECORD'
+EXPORTING
+archive_handle = gv_arc_hand
+record = gs_zcus
+record_structure = 'ZTESTARCH'.
+
+ENDLOOP.
+CALL FUNCTION 'ARCHIVE_SAVE_OBJECT'
+EXPORTING
+archive_handle = gv_arc_hand.
+
+ENDIF.
+
+ENDDO.
+* close archive file
+
+COMMIT WORK.
+
+CALL FUNCTION 'ARCHIVE_WRITE_STATISTICS'
+EXPORTING
+archive_handle = gv_arc_hand.
+
+CALL FUNCTION 'ARCHIVE_CLOSE_FILE'
+EXPORTING
+archive_handle = gv_arc_hand.
