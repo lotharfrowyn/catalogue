@@ -1,0 +1,155 @@
+* |------------------------------------------------------------------| *
+* | zpp_trace_bs_archive_write                                       | *
+* |------------------------------------------------------------------| *
+* | zbs                                                              | *
+* |------------------------------------------------------------------| *
+* | MHP                                                              | *
+* |------------------------------------------------------------------| *
+* | Programsources:                                                  | *
+* | zpp_trace_bs_archive_write_top                                   | *
+* |------------------------------------------------------------------| *
+* | Description:                                                     | *
+* | This program writes the selected entries to the archiving object | *
+* |------------------------------------------------------------------| *
+* | Concept:     Ashish Moghe, Panasonic                             | *
+* | Development: Raphael Eiﬂner, MHP                                 | *
+* |------------------------------------------------------------------| *
+* |------------------------------------------------------------------| *
+* | M O D I F I C A T I O N S L O G                                  | *
+* |------------------------------------------------------------------| *
+* | ID  | NAME               | DATE     | DESCRIPTION                | *
+* |-----|--------------------|----------|----------------------------| *
+* |     |                    |          |                            | *
+* |-----|--------------------|----------|----------------------------| *
+* |     |                    |          |                            | *
+* |-----|--------------------|----------|----------------------------| *
+* |     |                    |          |                            | *
+* |-----|--------------------|----------|----------------------------| *
+* |     |                    |          |                            | *
+* |-----|--------------------|----------|----------------------------| *
+* |     |                    |          |                            | *
+* -------------------------------------------------------------------- *
+REPORT zpp_trace_bs_archive_write.
+
+INCLUDE zpp_trace_bs_archive_write_top.    " global Data
+
+* Start-of-selection
+START-OF-SELECTION.
+
+* set runtime parameters
+  CLEAR: gv_test.
+
+  IF NOT p_test IS INITIAL.
+    gv_test = abap_true.
+  ENDIF.
+
+* open archive file
+  CALL FUNCTION 'ARCHIVE_OPEN_FOR_WRITE'
+    EXPORTING
+      call_delete_job_in_test_mode = gv_test
+      create_archive_file          = abap_true
+      object                       = gc_obj
+    IMPORTING
+      archive_handle               = gv_arc_hand
+    EXCEPTIONS
+      internal_error               = 1
+      object_not_found             = 2
+      open_error                   = 3
+      not_authorized               = 4.
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+    WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+* Read the entries from Database
+  CLEAR gv_count_rec.
+  OPEN CURSOR WITH HOLD ztrace_cur FOR
+  SELECT * FROM zpp_trace_bs WHERE oudat < p_oudat.
+  DO.
+    FETCH NEXT CURSOR ztrace_cur INTO TABLE gt_trace
+    PACKAGE SIZE 1000.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+    SORT gt_trace.
+
+* open archive object
+    gv_count = LINES( gt_trace ).
+    gv_count_rec = gv_count_rec + gv_count.
+
+    IF gv_count_rec GT 0 AND gv_test EQ space.
+      CALL FUNCTION 'ARCHIVE_NEW_OBJECT'
+        EXPORTING
+          archive_handle          = gv_arc_hand
+        EXCEPTIONS
+          internal_error          = 1
+          wrong_access_to_archive = 2
+          OTHERS                  = 3.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ENDIF.
+
+      LOOP AT gt_trace INTO gs_trace.
+        CALL FUNCTION 'ARCHIVE_PUT_RECORD'
+          EXPORTING
+            archive_handle           = gv_arc_hand
+            record                   = gs_trace
+            record_structure         = gc_struc
+          EXCEPTIONS
+            internal_error           = 1
+            wrong_access_to_archive  = 2
+            invalid_record_structure = 3
+            OTHERS                   = 4.
+        IF sy-subrc <> 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        ENDIF.
+      ENDLOOP.
+
+      CALL FUNCTION 'ARCHIVE_SAVE_OBJECT'
+        EXPORTING
+          archive_handle          = gv_arc_hand
+        EXCEPTIONS
+          file_io_error           = 1
+          internal_error          = 2
+          open_error              = 3
+          termination_requested   = 4
+          wrong_access_to_archive = 5
+          data_object_not_saved   = 6
+          OTHERS                  = 7.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ENDIF.
+    ENDIF.
+    CLEAR gt_trace[].
+  ENDDO.
+* close archive file
+
+  COMMIT WORK.
+
+  CALL FUNCTION 'ARCHIVE_WRITE_STATISTICS'
+    EXPORTING
+      archive_handle          = gv_arc_hand
+    EXCEPTIONS
+      internal_error          = 1
+      wrong_access_to_archive = 2
+      OTHERS                  = 3.
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+  CALL FUNCTION 'ARCHIVE_CLOSE_FILE'
+    EXPORTING
+      archive_handle               = gv_arc_hand
+    EXCEPTIONS
+      internal_error               = 1
+      wrong_access_to_archive      = 2
+      archiving_standard_violation = 3
+      OTHERS                       = 4.
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.

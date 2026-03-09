@@ -1,0 +1,31 @@
+*&---------------------------------------------------------------------*
+*& Include ZPP_TRACE_BS_ARCHIVE_WRITE_TOP                    Report ZPP_TRACE_BS_ARCHIVE_WRITE
+*&
+*&---------------------------------------------------------------------*
+
+* data definition
+TYPE-POOLS: abap.
+
+TABLES: zpp_trace_bs.
+
+CONSTANTS: gc_struc TYPE rkz_dbna VALUE 'ZPP_TRACE_BS',
+           gc_obj   TYPE objct_tr01 VALUE 'ZTRACE_BS'.
+
+DATA: gv_test(1) TYPE c,
+      gv_arc_hand TYPE sy-tabix,
+      gv_text TYPE admi_run-comments,
+      gv_datu TYPE sy-datum,
+      gt_trace TYPE TABLE OF zpp_trace_bs,
+      gs_trace TYPE zpp_trace_bs,
+      ztrace_cur TYPE cursor,
+      gv_count_rec TYPE i,
+      gv_count TYPE i.
+
+* Selection parameters
+SELECTION-SCREEN BEGIN OF BLOCK sel_data WITH FRAME TITLE text-001.
+PARAMETERS: p_oudat TYPE vvdauszg OBLIGATORY.
+SELECTION-SCREEN END OF BLOCK sel_data.
+
+SELECTION-SCREEN BEGIN OF BLOCK sel_prog WITH FRAME TITLE text-002.
+PARAMETERS: p_test AS CHECKBOX DEFAULT abap_true.
+SELECTION-SCREEN END OF BLOCK sel_prog.
